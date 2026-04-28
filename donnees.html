@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Données{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="section-card">
+    <div class="section-title">
+      <div class="icon-box icon-blue">📁</div>
+      Base de Données Patients
+      <span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:.82rem;color:var(--muted)">
+        {{ total }} dossier(s) au total
+      </span>
+    </div>
+
+    <!-- FILTRES -->
+    <form method="GET" action="{{ url_for('donnees') }}">
+      <div class="filter-bar">
+        <input type="text" name="q" value="{{ q }}"
+               placeholder="🔍  Nom, pathologie, adresse…"
+               oninput="this.form.submit()">
+        <select name="sexe" onchange="this.form.submit()">
+          <option value="">Sexe</option>
+          {% for s in ['Masculin','Féminin','Autre / Non précisé'] %}
+          <option {% if sexe == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <select name="severite" onchange="this.form.submit()">
+          <option value="">Sévérité</option>
+          {% for s in ['Légère','Modérée','Sévère','Critique'] %}
+          <option {% if severite == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        {% if q or sexe or severite %}
+        <a href="{{ url_for('donnees') }}" class="btn btn-outline btn-sm">✕ Effacer</a>
+        {% endif %}
+        <a href="{{ url_for('export_csv') }}" class="btn btn-outline btn-sm">⬇️ CSV</a>
+        <span class="record-count">{{ patients|length }} résultat(s)</span>
+      </div>
+    </form>
+
+    {% if patients %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Patient</th>
+            <th>Âge</th>
+            <th>Sexe</th>
+            <th>Pathologie</th>
+            <th>Sévérité</th>
+            <th>Statut</th>
+            <th>Tension</th>
+            <th>Glycémie</th>
+            <th>Milieu</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in patients %}
+          <tr>
+            <td><code>{{ p.id }}</code></td>
+            <td><strong>{{ p.prenom }} {{ p.nom }}</strong></td>
+            <td>{{ p.age }} ans</td>
+            <td>
+              {% if p.sexe == 'Masculin' %}♂
+              {% elif p.sexe == 'Féminin' %}♀
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ p.pathologie }}</td>
+            <td><span class="badge badge-{{ p.severite|severity_class }}">{{ p.severite }}</span></td>
+            <td><span class="badge badge-{{ p.statut|status_class }}">{{ p.statut }}</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:.8rem">{{ p.sys }}/{{ p.dia }} mmHg</td>
+            <td style="font-family:'DM Mono',monospace;font-size:.8rem">{{ p.glyc }} g/L</td>
+            <td>{{ p.milieu or '—' }}</td>
+            <td style="color:var(--muted);font-size:.8rem;white-space:nowrap">{{ p.date }}</td>
+            <td>
+              <form method="POST"
+                    action="{{ url_for('supprimer', pid=p.id) }}"
+                    onsubmit="return confirm('Supprimer définitivement le dossier {{ p.id }} ?')">
+                <button type="submit"
+                        class="btn btn-danger btn-sm btn-icon"
+                        onmouseenter="showTip(event,'Supprimer {{ p.prenom }} {{ p.nom }}')"
+                        onmouseleave="hideTip()">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <span class="emoji">🗄️</span>
+      <p>Aucun dossier trouvé.<br>
+         <a href="{{ url_for('collecte') }}" style="color:var(--accent)">Enregistrer un premier dossier</a>
+         ou modifier les filtres.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

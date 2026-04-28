@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environnement virtuel
+venv/
+env/
+.env/
+.venv/
+
+# Variables d'environnement
+.env
+*.env
+
+# Données (optionnel — retirez cette ligne si vous voulez versionner patients.json)
+patients.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

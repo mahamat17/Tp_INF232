@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Collecte{% endblock %}
+
+{% block content %}
+<div class="container container-narrow">
+
+  <!-- ÉTAPES -->
+  <div class="progress-steps">
+    {% for num, label in [(1,'Identité'),(2,'Clinique'),(3,'Social'),(4,'Validation')] %}
+    <div class="step {% if step > num %}done{% elif step == num %}active{% endif %}">
+      <div class="step-dot">{{ '✓' if step > num else num }}</div>
+      <div class="step-label">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="POST" action="{{ url_for('collecte') }}">
+
+    {# ═══════ ÉTAPE 1 : IDENTITÉ ═══════ #}
+    {% if step == 1 %}
+    <div class="section-card">
+      <div class="section-title"><div class="icon-box icon-green">👤</div> Informations du Patient</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Prénom <span class="req">*</span></label>
+          <input type="text" name="prenom" value="{{ form_data.get('prenom','') }}" placeholder="Jean" required>
+        </div>
+        <div class="field">
+          <label>Nom <span class="req">*</span></label>
+          <input type="text" name="nom" value="{{ form_data.get('nom','') }}" placeholder="DUPONT" required>
+        </div>
+        <div class="field">
+          <label>Date de naissance <span class="req">*</span></label>
+          <input type="date" name="ddn" value="{{ form_data.get('ddn','') }}" required>
+        </div>
+        <div class="field">
+          <label>Sexe <span class="req">*</span></label>
+          <select name="sexe" required>
+            <option value="">— Sélectionner —</option>
+            {% for s in ['Masculin','Féminin','Autre / Non précisé'] %}
+            <option {% if form_data.get('sexe')==s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Date d'admission <span class="req">*</span></label>
+          <input type="date" name="admission" value="{{ form_data.get('admission', today) }}" required>
+        </div>
+        <div class="field">
+          <label>Localité / Adresse</label>
+          <input type="text" name="adresse" value="{{ form_data.get('adresse','') }}" placeholder="Ville, Quartier, Région…">
+        </div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">← Annuler</a>
+      <button type="submit" name="step" value="2" class="btn btn-primary btn-sm">Suivant →</button>
+    </div>
+
+    {# ═══════ ÉTAPE 2 : CLINIQUE ═══════ #}
+    {% elif step == 2 %}
+    {% for k,v in form_data.items() %}{% if k != 'step' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+
+    <div class="section-card">
+      <div class="section-title"><div class="icon-box icon-red">🏥</div> Données Cliniques</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Pathologie principale <span class="req">*</span></label>
+          <select name="pathologie" required>
+            <option value="">— Sélectionner —</option>
+            {% for p in ['Paludisme','Tuberculose','Diabète de type 2','Hypertension artérielle',
+                         'Pneumonie','Choléra','VIH/SIDA','Dengue','Méningite','Malnutrition','Autre'] %}
+            <option {% if form_data.get('pathologie')==p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Statut clinique <span class="req">*</span></label>
+          <select name="statut" required>
+            <option value="">— Sélectionner —</option>
+            {% for s in ['En traitement','Guéri','Hospitalisé','Décédé','Transféré'] %}
+            <option {% if form_data.get('statut')==s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Tension systolique (mmHg)</label>
+          <div class="range-row">
+            <input type="range" id="f-sys" name="sys" min="60" max="220" value="{{ form_data.get('sys', 120) }}">
+            <span class="range-val" id="v-sys">{{ form_data.get('sys', 120) }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tension diastolique (mmHg)</label>
+          <div class="range-row">
+            <input type="range" id="f-dia" name="dia" min="40" max="140" value="{{ form_data.get('dia', 80) }}">
+            <span class="range-val" id="v-dia">{{ form_data.get('dia', 80) }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Température (°C)</label>
+          <div class="range-row">
+            <input type="range" id="f-temp" name="temp" min="35" max="42" step="0.1" value="{{ form_data.get('temp', 37) }}">
+            <span class="range-val" id="v-temp">{{ form_data.get('temp', 37) }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Glycémie (g/L)</label>
+          <div class="range-row">
+            <input type="range" id="f-glyc" name="glyc" min="0.5" max="5" step="0.1" value="{{ form_data.get('glyc', 1.0) }}">
+            <span class="range-val" id="v-glyc">{{ form_data.get('glyc', 1.0) }}</span>
+          </div>
+        </div>
+
+        <div class="field form-full">
+          <label>Niveau de sévérité <span class="req">*</span></label>
+          <select name="severite" required>
+            <option value="">— Sélectionner —</option>
+            {% for s, e in [('Légère','🟢'),('Modérée','🟡'),('Sévère','🟠'),('Critique','🔴')] %}
+            <option value="{{ s }}" {% if form_data.get('severite')==s %}selected{% endif %}>{{ e }} {{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field form-full">
+          <label>Symptômes associés</label>
+          <div class="check-group">
+            {% for sym in ['Fièvre','Toux','Céphalées','Vomissements','Diarrhée',
+                           'Dyspnée','Douleurs','Fatigue','Éruption cutanée','Convulsions'] %}
+            <label class="check-item">
+              <input type="checkbox" name="symptomes" value="{{ sym }}"> <span>{{ sym }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button type="submit" name="step" value="1" class="btn btn-outline btn-sm">← Retour</button>
+      <button type="submit" name="step" value="3" class="btn btn-primary btn-sm">Suivant →</button>
+    </div>
+
+    {# ═══════ ÉTAPE 3 : SOCIAL ═══════ #}
+    {% elif step == 3 %}
+    {% for k,v in form_data.items() %}{% if k != 'step' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+
+    <div class="section-card">
+      <div class="section-title"><div class="icon-box icon-amber">🌐</div> Facteurs Socio-environnementaux</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Niveau d'instruction</label>
+          <select name="education">
+            <option value="">— Sélectionner —</option>
+            {% for e in ['Aucun','Primaire','Secondaire','Universitaire'] %}
+            <option {% if form_data.get('education')==e %}selected{% endif %}>{{ e }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Accès à l'eau potable</label>
+          <select name="eau">
+            <option value="">— Sélectionner —</option>
+            {% for e in ['Oui','Non','Partiel'] %}
+            <option {% if form_data.get('eau')==e %}selected{% endif %}>{{ e }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Milieu de vie</label>
+          <select name="milieu">
+            <option value="">— Sélectionner —</option>
+            {% for m in ['Urbain','Semi-urbain','Rural'] %}
+            <option {% if form_data.get('milieu')==m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Couverture vaccinale</label>
+          <select name="vaccin">
+            <option value="">— Sélectionner —</option>
+            {% for v in ['Complète','Partielle','Aucune','Inconnue'] %}
+            <option {% if form_data.get('vaccin')==v %}selected{% endif %}>{{ v }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field form-full">
+          <label>Observations / Notes cliniques</label>
+          <textarea name="notes" placeholder="Antécédents médicaux, traitements en cours, remarques particulières…">{{ form_data.get('notes','') }}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="nav-btns">
+      <button type="submit" name="step" value="2" class="btn btn-outline btn-sm">← Retour</button>
+      <button type="submit" name="step" value="4" class="btn btn-primary btn-sm">Prévisualiser →</button>
+    </div>
+
+    {# ═══════ ÉTAPE 4 : VALIDATION ═══════ #}
+    {% elif step == 4 %}
+    {% for k,v in form_data.items() %}{% if k != 'step' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+
+    <div class="section-card">
+      <div class="section-title"><div class="icon-box icon-green">✅</div> Récapitulatif du Dossier</div>
+      <div class="recap-grid">
+        {% set recap_fields = [
+          ('Prénom',          form_data.get('prenom','')),
+          ('Nom',             form_data.get('nom','')),
+          ('Date de naissance', form_data.get('ddn','')),
+          ('Sexe',            form_data.get('sexe','')),
+          ('Admission',       form_data.get('admission','')),
+          ('Localité',        form_data.get('adresse','—')),
+          ('Pathologie',      form_data.get('pathologie','')),
+          ('Statut',          form_data.get('statut','')),
+          ('Sévérité',        form_data.get('severite','')),
+          ('Tension (mmHg)',  form_data.get('sys','—') ~ '/' ~ form_data.get('dia','—')),
+          ('Température',     form_data.get('temp','—') ~ ' °C'),
+          ('Glycémie',        form_data.get('glyc','—') ~ ' g/L'),
+          ('Milieu',          form_data.get('milieu','—')),
+          ('Vaccination',     form_data.get('vaccin','—')),
+          ('Éducation',       form_data.get('education','—')),
+          ('Eau potable',     form_data.get('eau','—')),
+        ] %}
+        {% for label, val in recap_fields %}
+        <div>
+          <div class="recap-key">{{ label }}</div>
+          <div class="recap-val">{{ val or '—' }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if form_data.get('notes') %}
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div class="recap-key">Notes cliniques</div>
+        <div class="recap-val" style="margin-top:.25rem;white-space:pre-wrap;color:var(--muted)">{{ form_data.get('notes') }}</div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="nav-btns">
+      <button type="submit" name="step" value="3" class="btn btn-outline btn-sm">← Modifier</button>
+      <button type="submit" name="step" value="save" class="btn btn-primary">💾 Enregistrer le dossier</button>
+    </div>
+    {% endif %}
+
+  </form>
+</div>
+{% endblock %}
