@@ -1,76 +1,42 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}SantéData{% endblock %} — Épidémiologie</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  {% block head %}{% endblock %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FoodStat Cameroon{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<!-- ── HEADER ── -->
 <header>
-  <a class="logo" href="{{ url_for('index') }}">
-    <div class="logo-icon">🩺</div>
-    Santé<em>Data</em>
-  </a>
-  <nav>
-    <a href="{{ url_for('index') }}"    {% if request.endpoint == 'index'    %}class="active"{% endif %}>🏠 <span>Accueil</span></a>
-    <a href="{{ url_for('collecte') }}" {% if request.endpoint == 'collecte' %}class="active"{% endif %}>✚ <span>Collecte</span></a>
-    <a href="{{ url_for('donnees') }}"  {% if request.endpoint == 'donnees'  %}class="active"{% endif %}>📁 <span>Données</span></a>
-    <a href="{{ url_for('analyse') }}"  {% if request.endpoint == 'analyse'  %}class="active"{% endif %}>📊 <span>Analyse</span></a>
-  </nav>
+    <nav>
+        <div class="logo">📊 FoodStat 🇨🇲</div>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">🏠 Accueil</a>
+            <a href="{{ url_for('collecte') }}">📝 Collecte</a>
+            <a href="{{ url_for('donnees') }}">📋 Données</a>
+            <a href="{{ url_for('analyse') }}">📈 Analyse</a>
+        </div>
+    </nav>
 </header>
 
-<!-- ── MAIN ── -->
 <main>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div class="container" style="padding-bottom:0">
-        <ul class="flash-list">
-          {% for cat, msg in messages %}
-            <li class="flash-{{ cat }}">{{ msg }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
-  {% endwith %}
-
-  {% block content %}{% endblock %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    {% block content %}{% endblock %}
 </main>
 
-<!-- ── TOOLTIP GLOBAL ── -->
-<div class="tooltip" id="tooltip"></div>
+<footer>
+    <p>© {{ current_year }} FoodStat Cameroon - Analyse statistique complète de l'alimentation</p>
+    <p class="footer-math">Variance | Covariance | Corrélation (r) | Détermination (R²) | Droite de régression | Histogramme | Camembert</p>
+</footer>
 
-<!-- ── JS GLOBAL ── -->
-<script>
-  // Tooltip
-  const _tip = document.getElementById('tooltip');
-  function showTip(e, text) {
-    _tip.textContent = text;
-    _tip.classList.add('visible');
-    _moveTip(e);
-  }
-  function _moveTip(e) {
-    _tip.style.left = (e.clientX + 14) + 'px';
-    _tip.style.top  = (e.clientY - 32) + 'px';
-  }
-  function hideTip() { _tip.classList.remove('visible'); }
-  document.addEventListener('mousemove', e => { if (_tip.classList.contains('visible')) _moveTip(e); });
-
-  // Sliders — mise à jour de l'affichage
-  document.querySelectorAll('input[type="range"]').forEach(r => {
-    const out = document.getElementById('v-' + r.id.replace('f-',''));
-    if (!out) return;
-    const decimals = (r.step && parseFloat(r.step) < 1) ? 1 : 0;
-    r.addEventListener('input', () => {
-      out.textContent = parseFloat(r.value).toFixed(decimals);
-    });
-  });
-</script>
-
-{% block scripts %}{% endblock %}
 </body>
 </html>
