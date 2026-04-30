@@ -1,343 +1,352 @@
 """
-╔══════════════════════════════════════════════════════════════╗
-║  SantéData — app.py                                          ║
-║  Application Flask de collecte & analyse épidémiologique     ║
-║  INF232 · TP EC2 · Déployable sur Render.com                 ║
-╚══════════════════════════════════════════════════════════════╝
+FoodStat Cameroon - Application statistique complète
+Analyse des données alimentaires avec :
+- Variance, covariance
+- Coefficient de corrélation linéaire
+- Coefficient de détermination (R²)
+- Droite de régression
+- Histogramme, diagramme circulaire (camembert)
+- Toutes les grandeurs statistiques
 """
 
-from flask import (
-    Flask, render_template, request, redirect,
-    url_for, flash, jsonify, send_file
-)
-import json, os, csv, io, math
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+import json, os, math, random
 from datetime import datetime, date
+from collections import Counter
 
-# ─────────────────────────────────────────────
-# CONFIGURATION
-# ─────────────────────────────────────────────
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "santedata_inf232_secret_2024")
+app.secret_key = "foodstat_cameroon_secret"
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "patients.json")
+DATA_FILE = os.path.join(os.path.dirname(__file__), "food_data.json")
 
+# Liste des aliments camerounais
+ALIMENTS_CAMEROUNAIS = [
+    "Ndolé", "Eru", "OKOK", "Poulet DG", "Koki", "Fufu", "Taro sauce",
+    "Plantain frites", "Poisson braisé", "Sanga", "Kwem", "Manioc(bâton)",
+    "Miondo", "Saka saka", "Mbongo", "Nnam Mbongo", "Bâton de manioc"
+]
 
-# ─────────────────────────────────────────────
-# PERSISTANCE JSON
-# ─────────────────────────────────────────────
-def load_patients() -> list:
+REGIONS = [
+    "Adamaoua", "Centre", "Est", "Extrême-Nord", "Littoral",
+    "Nord", "Nord-Ouest", "Ouest", "Sud", "Sud-Ouest"
+]
+
+def load_data():
     if not os.path.exists(DATA_FILE):
         return []
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
-def save_patients(patients: list) -> None:
+def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(patients, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
+# ==================== FONCTIONS STATISTIQUES ====================
 
-def generate_id(patients: list) -> str:
-    return f"SD-{len(patients) + 1:04d}"
-
-
-def calc_age(ddn_str: str) -> int:
-    try:
-        ddn   = datetime.strptime(ddn_str, "%Y-%m-%d").date()
-        today = date.today()
-        return today.year - ddn.year - (
-            (today.month, today.day) < (ddn.month, ddn.day)
-        )
-    except Exception:
+def moyenne(valeurs):
+    """Calcule la moyenne d'une liste"""
+    if not valeurs:
         return 0
+    return sum(valeurs) / len(valeurs)
 
+def variance(valeurs):
+    """Calcule la variance (population)"""
+    if len(valeurs) < 2:
+        return 0
+    m = moyenne(valeurs)
+    return sum((x - m) ** 2 for x in valeurs) / len(valeurs)
 
-# ─────────────────────────────────────────────
-# STATISTIQUES DESCRIPTIVES
-# ─────────────────────────────────────────────
-def mean(values: list) -> float:
-    return sum(values) / len(values) if values else 0.0
+def covariance(xs, ys):
+    """Calcule la covariance entre deux séries"""
+    if len(xs) < 2 or len(ys) < 2:
+        return 0
+    if len(xs) != len(ys):
+        return 0
+    mx = moyenne(xs)
+    my = moyenne(ys)
+    return sum((xs[i] - mx) * (ys[i] - my) for i in range(len(xs))) / len(xs)
 
-def variance(values: list) -> float:
-    if len(values) < 2:
-        return 0.0
-    m = mean(values)
-    return sum((x - m) ** 2 for x in values) / len(values)
+def ecart_type(valeurs):
+    """Calcule l'écart-type"""
+    return math.sqrt(variance(valeurs))
 
-def std_dev(values: list) -> float:
-    return math.sqrt(variance(values))
+def coefficient_correlation(xs, ys):
+    """Coefficient de corrélation linéaire de Pearson (r)"""
+    if len(xs) < 2 or len(ys) < 2:
+        return 0
+    cov = covariance(xs, ys)
+    sigma_x = ecart_type(xs)
+    sigma_y = ecart_type(ys)
+    if sigma_x == 0 or sigma_y == 0:
+        return 0
+    return cov / (sigma_x * sigma_y)
 
-def median(values: list) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    n, mid = len(s), len(s) // 2
-    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+def coefficient_determination(xs, ys):
+    """Coefficient de détermination R²"""
+    r = coefficient_correlation(xs, ys)
+    return r ** 2
 
-def frequency(values: list) -> dict:
-    total  = len(values)
-    counts = {}
-    for v in values:
-        counts[v] = counts.get(v, 0) + 1
-    return {
-        k: {"abs": c, "rel": round(c / total * 100, 1)}
-        for k, c in sorted(counts.items(), key=lambda x: -x[1])
-    }
-
-def linear_regression(xs: list, ys: list):
-    n = len(xs)
-    if n < 2:
-        return None
-    mx, my = mean(xs), mean(ys)
-    num    = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
-    den    = sum((x - mx) ** 2 for x in xs)
+def regression_lineaire(xs, ys):
+    """Calcule la droite de régression y = ax + b"""
+    if len(xs) < 2:
+        return {"a": 0, "b": 0, "equation": "y = 0"}
+    
+    mx = moyenne(xs)
+    my = moyenne(ys)
+    
+    num = sum((xs[i] - mx) * (ys[i] - my) for i in range(len(xs)))
+    den = sum((x - mx) ** 2 for x in xs)
+    
     if den == 0:
-        return None
-    b      = num / den
-    a      = my - b * mx
-    ss_tot = sum((y - my) ** 2 for y in ys)
-    ss_res = sum((ys[i] - (a + b * xs[i])) ** 2 for i in range(n))
-    r2     = 1 - ss_res / ss_tot if ss_tot != 0 else 1.0
-    sign   = "+" if a >= 0 else "-"
-    return {
-        "a":        round(a, 4),
-        "b":        round(b, 4),
-        "r2":       round(r2, 4),
-        "equation": f"ŷ = {b:.4f}x {sign} {abs(a):.4f}",
-    }
+        return {"a": 0, "b": my, "equation": f"y = {my:.2f}"}
+    
+    a = num / den  # pente
+    b = my - a * mx  # ordonnée à l'origine
+    
+    signe = "+" if b >= 0 else "-"
+    equation = f"y = {a:.4f}x {signe} {abs(b):.4f}"
+    
+    return {"a": round(a, 4), "b": round(b, 4), "equation": equation}
 
-def age_histogram(ages: list) -> list:
-    bins   = [0, 10, 20, 30, 40, 50, 60, 70, 80, 200]
-    labels = [f"{bins[i]}–{bins[i+1]-1}" for i in range(len(bins) - 1)]
-    counts = [sum(1 for a in ages if bins[i] <= a < bins[i+1])
-              for i in range(len(bins) - 1)]
-    return [{"label": labels[i], "count": counts[i]}
-            for i in range(len(labels))]
-
-def descriptive_stats(patients: list) -> dict:
-    if not patients:
+def calculer_statistiques_completes(data):
+    """Calcule toutes les grandeurs statistiques"""
+    if not data:
         return {}
-
-    ages  = [p["age"]  for p in patients]
-    sys_v = [p["sys"]  for p in patients]
-    dia_v = [p["dia"]  for p in patients]
-    temp  = [p["temp"] for p in patients]
-    glyc  = [p["glyc"] for p in patients]
-
-    def block(vals, label):
-        return {
-            "label":  label,
-            "n":      len(vals),
-            "mean":   round(mean(vals), 2),
-            "median": round(median(vals), 2),
-            "std":    round(std_dev(vals), 2),
-            "min":    round(min(vals), 2),
-            "max":    round(max(vals), 2),
-            "range":  round(max(vals) - min(vals), 2),
-        }
-
-    regressions = {}
-    if len(patients) >= 2:
-        reg_pairs = [
-            ("age_sys",  ages,  sys_v, "Âge (ans)", "Tension sys. (mmHg)", "age", "sys",  "#0ea5e9"),
-            ("age_glyc", ages,  glyc,  "Âge (ans)", "Glycémie (g/L)",      "age", "glyc", "#00e5a0"),
-            ("age_temp", ages,  temp,  "Âge (ans)", "Température (°C)",    "age", "temp", "#f59e0b"),
-            ("sys_dia",  sys_v, dia_v, "Tension sys. (mmHg)", "Tension dia. (mmHg)", "sys", "dia", "#ef4444"),
-        ]
-        for key, xs, ys, xl, yl, xk, yk, col in reg_pairs:
-            reg = linear_regression(xs, ys)
-            if reg:
-                regressions[key] = {**reg, "xlabel": xl, "ylabel": yl,
-                                    "xkey": xk, "ykey": yk, "color": col}
-
+    
+    # Extraire les variables numériques
+    ages = [d["age"] for d in data]
+    repas_par_jour = [d.get("nb_repas", 3) for d in data]
+    budget = [d.get("budget", 5000) for d in data]
+    satisfaction = [d.get("satisfaction", 5) for d in data]
+    
+    # Variables catégorielles
+    regions = [d.get("region", "") for d in data]
+    sexes = [d.get("sexe", "") for d in data]
+    aliments_principaux = [d.get("aliment_principal", "") for d in data]
+    
+    # Statistiques univariées (Âge)
+    stat_age = {
+        "moyenne": round(moyenne(ages), 2),
+        "variance": round(variance(ages), 2),
+        "ecart_type": round(ecart_type(ages), 2),
+        "min": min(ages) if ages else 0,
+        "max": max(ages) if ages else 0,
+        "effectif": len(ages),
+        "somme": sum(ages),
+        "quartiles": calculer_quartiles(ages)
+    }
+    
+    # Statistiques univariées (Budget)
+    stat_budget = {
+        "moyenne": round(moyenne(budget), 2),
+        "variance": round(variance(budget), 2),
+        "ecart_type": round(ecart_type(budget), 2),
+        "min": min(budget) if budget else 0,
+        "max": max(budget) if budget else 0,
+        "effectif": len(budget),
+        "somme": sum(budget)
+    }
+    
+    # Statistiques bivariées
+    # Corrélation Âge vs Budget
+    corr_age_budget = coefficient_correlation(ages, budget)
+    
+    # Corrélation Âge vs Nombre de repas
+    corr_age_repas = coefficient_correlation(ages, repas_par_jour)
+    
+    # Corrélation Budget vs Satisfaction
+    corr_budget_satisfaction = coefficient_correlation(budget, satisfaction)
+    
+    # Droites de régression
+    reg_age_budget = regression_lineaire(ages, budget)
+    reg_age_repas = regression_lineaire(ages, repas_par_jour)
+    
+    # Diagramme circulaire (camembert) - Répartition par région
+    region_counts = Counter([r for r in regions if r])
+    camembert_regions = [{"label": k, "value": v} for k, v in region_counts.items()]
+    
+    # Diagramme circulaire - Répartition par sexe
+    sexe_counts = Counter([s for s in sexes if s])
+    camembert_sexes = [{"label": k, "value": v} for k, v in sexe_counts.items()]
+    
+    # Diagramme circulaire - Aliments préférés
+    aliment_counts = Counter([a for a in aliments_principaux if a])
+    camembert_aliments = [{"label": k[:20], "value": v} for k, v in aliment_counts.most_common(6)]
+    
+    # Histogramme des âges (tranches)
+    bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 100]
+    labels = ["0-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "80+"]
+    histo_ages = [sum(1 for a in ages if bins[i] < a <= bins[i+1]) for i in range(len(bins)-1)]
+    histogramme_ages = [{"label": labels[i], "count": histo_ages[i]} for i in range(len(labels))]
+    
     return {
-        "stats":       [block(ages, "Âge (ans)"),
-                        block(sys_v, "Tension sys. (mmHg)"),
-                        block(dia_v, "Tension dia. (mmHg)"),
-                        block(glyc,  "Glycémie (g/L)"),
-                        block(temp,  "Température (°C)")],
-        "pathologies": frequency([p["pathologie"] for p in patients]),
-        "severite":    frequency([p["severite"]   for p in patients]),
-        "sexe":        frequency([p["sexe"]       for p in patients]),
-        "statut":      frequency([p["statut"]     for p in patients]),
-        "milieu":      frequency([p.get("milieu", "Non précisé") for p in patients]),
-        "education":   frequency([p.get("education", "Non précisé") for p in patients]),
-        "regressions": regressions,
-        "age_bins":    age_histogram(ages),
-        "total":       len(patients),
-        "crit":        sum(1 for p in patients if p["severite"] == "Critique"),
-        "age_mean":    round(mean(ages), 1),
-        "diseases":    len(set(p["pathologie"] for p in patients)),
+        "effectif_total": len(data),
+        "statistiques_age": stat_age,
+        "statistiques_budget": stat_budget,
+        "correlations": {
+            "age_vs_budget": {
+                "r": round(corr_age_budget, 4),
+                "r2": round(corr_age_budget ** 2, 4),
+                "covariance": round(covariance(ages, budget), 2),
+                "interpretation": interpretation_correlation(corr_age_budget),
+                "regression": reg_age_budget
+            },
+            "age_vs_nb_repas": {
+                "r": round(corr_age_repas, 4),
+                "r2": round(corr_age_repas ** 2, 4),
+                "covariance": round(covariance(ages, repas_par_jour), 2),
+                "interpretation": interpretation_correlation(corr_age_repas),
+                "regression": reg_age_repas
+            },
+            "budget_vs_satisfaction": {
+                "r": round(corr_budget_satisfaction, 4),
+                "r2": round(corr_budget_satisfaction ** 2, 4),
+                "covariance": round(covariance(budget, satisfaction), 2),
+                "interpretation": interpretation_correlation(corr_budget_satisfaction),
+                "regression": regression_lineaire(budget, satisfaction)
+            }
+        },
+        "diagrammes": {
+            "camembert_regions": camembert_regions,
+            "camembert_sexes": camembert_sexes,
+            "camembert_aliments": camembert_aliments,
+            "histogramme_ages": histogramme_ages
+        },
+        "matrice_correlation": calculer_matrice_correlation(ages, budget, repas_par_jour, satisfaction)
     }
 
+def calculer_quartiles(valeurs):
+    """Calcule les quartiles Q1, Q2 (médiane), Q3"""
+    if not valeurs:
+        return {"Q1": 0, "Q2": 0, "Q3": 0}
+    sorted_vals = sorted(valeurs)
+    n = len(sorted_vals)
+    q2 = sorted_vals[n // 2]
+    q1 = sorted_vals[n // 4] if n >= 4 else q2
+    q3 = sorted_vals[3 * n // 4] if n >= 4 else q2
+    return {"Q1": q1, "Q2": q2, "Q3": q3}
 
-# ─────────────────────────────────────────────
-# ROUTES
-# ─────────────────────────────────────────────
+def interpretation_correlation(r):
+    """Interprète le coefficient de corrélation"""
+    abs_r = abs(r)
+    if abs_r >= 0.8:
+        return "Très forte corrélation"
+    elif abs_r >= 0.6:
+        return "Forte corrélation"
+    elif abs_r >= 0.4:
+        return "Corrélation modérée"
+    elif abs_r >= 0.2:
+        return "Faible corrélation"
+    else:
+        return "Corrélation très faible ou nulle"
+
+def calculer_matrice_correlation(ages, budget, repas, satisfaction):
+    """Calcule la matrice de corrélation"""
+    variables = [
+        ("Âge", ages),
+        ("Budget", budget),
+        ("Nb repas/jour", repas),
+        ("Satisfaction", satisfaction)
+    ]
+    matrice = []
+    for i, (nom1, vals1) in enumerate(variables):
+        ligne = []
+        for j, (nom2, vals2) in enumerate(variables):
+            if i == j:
+                ligne.append(1.0)
+            else:
+                corr = coefficient_correlation(vals1, vals2)
+                ligne.append(round(corr, 4))
+        matrice.append(ligne)
+    return {"labels": [v[0] for v in variables], "matrice": matrice}
+
+# ==================== ROUTES ====================
 
 @app.route("/")
 def index():
-    patients = load_patients()
-    recent   = list(reversed(patients))[:6]
-    stats = {
-        "total":    len(patients),
-        "age_mean": round(mean([p["age"] for p in patients]), 1) if patients else "—",
-        "crit":     sum(1 for p in patients if p["severite"] == "Critique"),
-        "diseases": len(set(p["pathologie"] for p in patients)),
-    }
-    return render_template("index.html", recent=recent, stats=stats)
-
+    data = load_data()
+    stats = calculer_statistiques_completes(data)
+    recent = list(reversed(data))[:5]
+    return render_template("index.html", stats=stats, recent=recent, total=len(data))
 
 @app.route("/collecte", methods=["GET", "POST"])
 def collecte():
     if request.method == "POST":
-        patients = load_patients()
-        step     = request.form.get("step", "1")
-
-        if step == "save":
-            symptomes = request.form.getlist("symptomes")
-            ddn       = request.form.get("ddn", "")
-            patient   = {
-                "id":         generate_id(patients),
-                "date":       request.form.get("admission", str(date.today())),
-                "prenom":     request.form.get("prenom", "").strip().title(),
-                "nom":        request.form.get("nom",    "").strip().upper(),
-                "ddn":        ddn,
-                "age":        calc_age(ddn),
-                "sexe":       request.form.get("sexe", ""),
-                "adresse":    request.form.get("adresse", "").strip(),
-                "pathologie": request.form.get("pathologie", ""),
-                "statut":     request.form.get("statut", ""),
-                "severite":   request.form.get("severite", ""),
-                "sys":        int(request.form.get("sys", 120)),
-                "dia":        int(request.form.get("dia", 80)),
-                "temp":       float(request.form.get("temp", 37.0)),
-                "glyc":       float(request.form.get("glyc", 1.0)),
-                "symptomes":  symptomes,
-                "education":  request.form.get("education", ""),
-                "eau":        request.form.get("eau", ""),
-                "milieu":     request.form.get("milieu", ""),
-                "vaccin":     request.form.get("vaccin", ""),
-                "notes":      request.form.get("notes", "").strip(),
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            }
-            patients.append(patient)
-            save_patients(patients)
-            flash(f"✅ Dossier {patient['id']} enregistré avec succès !", "success")
-            return redirect(url_for("index"))
-
-        form_data = dict(request.form)
-        return render_template("collecte.html",
-                               step=int(step),
-                               form_data=form_data,
-                               today=str(date.today()))
-
-    return render_template("collecte.html",
-                           step=1,
-                           form_data={},
-                           today=str(date.today()))
-
+        data = load_data()
+        
+        nouveau = {
+            "id": f"F{len(data)+1:04d}",
+            "date": str(date.today()),
+            "nom": request.form.get("nom", "").strip().upper(),
+            "prenom": request.form.get("prenom", "").strip().title(),
+            "age": int(request.form.get("age", 0)),
+            "sexe": request.form.get("sexe"),
+            "region": request.form.get("region"),
+            "ville": request.form.get("ville", ""),
+            "profession": request.form.get("profession", ""),
+            "aliment_principal": request.form.get("aliment_principal"),
+            "aliments_secondaires": request.form.get("aliments_secondaires", ""),
+            "nb_repas": int(request.form.get("nb_repas", 3)),
+            "budget": int(request.form.get("budget", 5000)),
+            "satisfaction": int(request.form.get("satisfaction", 3)),
+            "commentaire": request.form.get("commentaire", ""),
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
+        data.append(nouveau)
+        save_data(data)
+        flash(f"✅ Donnée enregistrée - ID: {nouveau['id']}", "success")
+        return redirect(url_for("index"))
+    
+    return render_template("collecte.html", regions=REGIONS, aliments=ALIMENTS_CAMEROUNAIS)
 
 @app.route("/donnees")
 def donnees():
-    patients = load_patients()
-    q        = request.args.get("q", "").lower()
-    sex      = request.args.get("sexe", "")
-    sev      = request.args.get("severite", "")
+    data = load_data()
+    return render_template("donnees.html", data=data, total=len(data))
 
-    filtered = [p for p in patients if (
-        (q in p["nom"].lower() or q in p["prenom"].lower()
-         or q in p["pathologie"].lower()
-         or q in p.get("adresse", "").lower())
-        and (not sex or p["sexe"] == sex)
-        and (not sev or p["severite"] == sev)
-    )]
-    return render_template("donnees.html",
-                           patients=filtered,
-                           total=len(patients),
-                           q=q, sexe=sex, severite=sev)
-
-
-@app.route("/donnees/supprimer/<pid>", methods=["POST"])
-def supprimer(pid):
-    patients = load_patients()
-    patients = [p for p in patients if p["id"] != pid]
-    save_patients(patients)
-    flash(f"🗑️ Dossier {pid} supprimé.", "warning")
+@app.route("/donnees/supprimer/<did>", methods=["POST"])
+def supprimer(did):
+    data = load_data()
+    data = [d for d in data if d["id"] != did]
+    save_data(data)
+    flash(f"🗑️ Donnée {did} supprimée", "warning")
     return redirect(url_for("donnees"))
-
-
-@app.route("/donnees/export")
-def export_csv():
-    patients = load_patients()
-    output   = io.StringIO()
-    fields   = ["id","date","nom","prenom","age","sexe","adresse",
-                 "pathologie","statut","severite","sys","dia","temp",
-                 "glyc","milieu","education","vaccin","notes","created_at"]
-    writer   = csv.DictWriter(output, fieldnames=fields,
-                               extrasaction="ignore", delimiter=";")
-    writer.writeheader()
-    for p in patients:
-        writer.writerow(p)
-
-    bom_csv = "\ufeff" + output.getvalue()
-    buf = io.BytesIO(bom_csv.encode("utf-8"))
-    buf.seek(0)
-    return send_file(buf,
-                     mimetype="text/csv; charset=utf-8",
-                     as_attachment=True,
-                     download_name=f"santedata_{date.today()}.csv")
-
 
 @app.route("/analyse")
 def analyse():
-    patients = load_patients()
-    stats    = descriptive_stats(patients)
-    return render_template("analyse.html", stats=stats, patients=patients)
-
+    data = load_data()
+    stats = calculer_statistiques_completes(data)
+    return render_template("analyse.html", stats=stats, total=len(data))
 
 @app.route("/api/scatter")
 def api_scatter():
-    xkey     = request.args.get("x", "age")
-    ykey     = request.args.get("y", "sys")
-    patients = load_patients()
-    xs  = [p.get(xkey, 0) for p in patients]
-    ys  = [p.get(ykey, 0) for p in patients]
-    reg = linear_regression(xs, ys) if len(patients) >= 2 else None
-    pts = [{"x": xs[i], "y": ys[i],
-             "name": f"{patients[i]['prenom']} {patients[i]['nom']}"}
-            for i in range(len(patients))]
-    return jsonify({"points": pts, "regression": reg})
-
-
-# ─────────────────────────────────────────────
-# FILTRES JINJA2
-# ─────────────────────────────────────────────
-@app.template_filter("severity_class")
-def severity_class(s):
-    return {"Légère": "green", "Modérée": "amber",
-            "Sévère": "amber", "Critique": "red"}.get(s, "blue")
-
-@app.template_filter("status_class")
-def status_class(s):
-    return {"Guéri": "green", "En traitement": "blue",
-            "Hospitalisé": "amber", "Décédé": "red",
-            "Transféré": "blue"}.get(s, "blue")
+    data = load_data()
+    x_key = request.args.get("x", "age")
+    y_key = request.args.get("y", "budget")
+    
+    x_map = {"age": "age", "budget": "budget", "nb_repas": "nb_repas", "satisfaction": "satisfaction"}
+    y_map = {"age": "age", "budget": "budget", "nb_repas": "nb_repas", "satisfaction": "satisfaction"}
+    
+    x_vals = [d.get(x_map.get(x_key, "age"), 0) for d in data]
+    y_vals = [d.get(y_map.get(y_key, "budget"), 0) for d in data]
+    
+    points = [{"x": x_vals[i], "y": y_vals[i], "name": f"{d['prenom']} {d['nom']}"} 
+              for i, d in enumerate(data)]
+    
+    regression = regression_lineaire(x_vals, y_vals)
+    correlation = coefficient_correlation(x_vals, y_vals)
+    
+    return jsonify({
+        "points": points,
+        "regression": regression,
+        "correlation": round(correlation, 4),
+        "r2": round(correlation ** 2, 4)
+    })
 
 @app.context_processor
-def inject_globals():
-    return {"current_year": datetime.now().year}
+def inject_year():
+    return {"current_year": datetime.now().year, "regions": REGIONS}
 
-
-# ─────────────────────────────────────────────
-# POINT D'ENTRÉE
-# ─────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_ENV", "production") == "development"
-    print("=" * 55)
-    print("  🩺  SantéData — Application Épidémiologique")
-    print(f"  📡  Serveur : http://0.0.0.0:{port}")
-    print("  🛑  Arrêt   : CTRL + C")
-    print("=" * 55)
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=False)
