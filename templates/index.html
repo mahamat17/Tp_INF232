@@ -1,86 +1,255 @@
 {% extends "base.html" %}
-{% block title %}Accueil{% endblock %}
+
+{% block title %}Accueil - FoodStat Cameroon{% endblock %}
 
 {% block content %}
-<div class="container">
 
-  <!-- HERO -->
-  <div class="hero">
-    <div class="hero-badge">🌍 Épidémiologie &amp; Santé Publique</div>
-    <h1>Collectez. Analysez.<br><em>Comprenez.</em></h1>
-    <p>Plateforme de surveillance épidémiologique pour la collecte et l'analyse descriptive des données de santé en milieu hospitalier et communautaire.</p>
-    <div class="hero-actions">
-      <a href="{{ url_for('collecte') }}" class="btn btn-primary">✚ Nouveau dossier patient</a>
-      <a href="{{ url_for('analyse') }}"  class="btn btn-outline">📊 Voir les analyses</a>
-    </div>
-  </div>
+<div class="hero">
+    <h1>🇨🇲 FoodStat Cameroon</h1>
+    <p>Analyse statistique complète de l'alimentation quotidienne des Camerounais</p>
+    <a href="{{ url_for('collecte') }}" class="btn-primary">✨ Participer à l'enquête</a>
+</div>
 
-  <!-- KPI -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-label">Total Patients</div>
-      <div class="stat-value">{{ stats.total }}</div>
-      <div class="stat-sub">Dossiers enregistrés</div>
+{% if total == 0 %}
+    <div class="alert-info">
+        <p>📊 Aucune donnée pour le moment. Soyez le premier à participer à l'étude !</p>
     </div>
+{% else %}
+
+<!-- ==================== INDICATEURS CLÉS ==================== -->
+<div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-label">Âge Moyen</div>
-      <div class="stat-value blue">{{ stats.age_mean }}</div>
-      <div class="stat-sub">ans</div>
+        <h3>👥 {{ total }}</h3>
+        <p>Participants</p>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Cas Critiques</div>
-      <div class="stat-value red">{{ stats.crit }}</div>
-      <div class="stat-sub">Sévérité critique</div>
+        <h3>🎂 {{ stats.statistiques_age.moyenne|default(0) }} ans</h3>
+        <p>Âge moyen</p>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Maladies Recensées</div>
-      <div class="stat-value amber">{{ stats.diseases }}</div>
-      <div class="stat-sub">Types distincts</div>
+        <h3>💰 {{ stats.statistiques_budget.moyenne|default(0) }} FCFA</h3>
+        <p>Budget journalier moyen</p>
     </div>
-  </div>
-
-  <!-- DERNIERS DOSSIERS -->
-  <div class="section-card">
-    <div class="section-title">
-      <div class="icon-box icon-blue">📋</div>
-      Derniers Dossiers Enregistrés
-      {% if recent %}
-      <a href="{{ url_for('donnees') }}" class="btn btn-outline btn-sm" style="margin-left:auto">Tous →</a>
-      {% endif %}
+    <div class="stat-card">
+        <h3>📈 {{ stats.correlations.age_vs_budget.r|default(0) }}</h3>
+        <p>Corrélation Âge ↔ Budget</p>
     </div>
+</div>
 
+<!-- ==================== DERNIERS ENREGISTREMENTS ==================== -->
+<div class="section">
+    <h2>📋 Derniers participants</h2>
     {% if recent %}
-    <div class="table-wrap">
-      <table>
+    <table>
         <thead>
-          <tr>
-            <th>ID</th><th>Patient</th><th>Âge</th>
-            <th>Pathologie</th><th>Sévérité</th><th>Statut</th><th>Date</th>
-          </tr>
+            <tr><th>Date</th><th>Nom</th><th>Âge</th><th>Région</th><th>Aliment principal</th><th>Budget</th></tr>
         </thead>
         <tbody>
-          {% for p in recent %}
-          <tr>
-            <td><code>{{ p.id }}</code></td>
-            <td><strong>{{ p.prenom }} {{ p.nom }}</strong></td>
-            <td>{{ p.age }} ans</td>
-            <td>{{ p.pathologie }}</td>
-            <td><span class="badge badge-{{ p.severite|severity_class }}">{{ p.severite }}</span></td>
-            <td><span class="badge badge-{{ p.statut|status_class }}">{{ p.statut }}</span></td>
-            <td style="color:var(--muted);font-size:.8rem">{{ p.date }}</td>
-          </tr>
-          {% endfor %}
+            {% for r in recent %}
+            <tr>
+                <td>{{ r.date }}</td>
+                <td>{{ r.nom }} {{ r.prenom }}</td>
+                <td>{{ r.age }} ans</td>
+                <td>{{ r.region }}</td>
+                <td>{{ r.aliment_principal }}</td>
+                <td>{{ r.budget }} FCFA</td>
+            </tr>
+            {% endfor %}
         </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="empty-state">
-      <span class="emoji">📂</span>
-      <p>Aucun dossier enregistré.<br>
-         Commencez par <a href="{{ url_for('collecte') }}" style="color:var(--accent)">Nouveau dossier patient</a>.</p>
+    </table>
+    <div class="text-center">
+        <a href="{{ url_for('donnees') }}" class="btn-secondary">📊 Voir toutes les données</a>
+        <a href="{{ url_for('analyse') }}" class="btn-secondary">📈 Accéder à l'analyse complète</a>
     </div>
     {% endif %}
-  </div>
-
 </div>
+
+<!-- ==================== COEFFICIENTS IMPORTANTS ==================== -->
+<div class="section">
+    <h2>🎯 Indicateurs statistiques clés</h2>
+    <div class="keys-grid">
+        <div class="key-item">
+            <span class="key-label">Variance (Âge) :</span>
+            <span class="key-value">{{ stats.statistiques_age.variance|default(0) }}</span>
+        </div>
+        <div class="key-item">
+            <span class="key-label">Écart-type (Âge) :</span>
+            <span class="key-value">{{ stats.statistiques_age.ecart_type|default(0) }}</span>
+        </div>
+        <div class="key-item">
+            <span class="key-label">Covariance (Âge/Budget) :</span>
+            <span class="key-value">{{ stats.correlations.age_vs_budget.covariance|default(0) }}</span>
+        </div>
+        <div class="key-item">
+            <span class="key-label">R² (Âge/Budget) :</span>
+            <span class="key-value">{{ stats.correlations.age_vs_budget.r2|default(0) }}</span>
+        </div>
+        <div class="key-item">
+            <span class="key-label">Droite de régression :</span>
+            <span class="key-value"><code>{{ stats.correlations.age_vs_budget.regression.equation|default("Non disponible") }}</code></span>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== APERÇU DES DIAGRAMMES ==================== -->
+<div class="section">
+    <h2>📊 Aperçu des diagrammes</h2>
+    <div class="preview-grid">
+        <div class="preview-card">
+            <h3>Histogramme des âges</h3>
+            <canvas id="previewHistogram" height="200"></canvas>
+        </div>
+        <div class="preview-card">
+            <h3>Répartition par région</h3>
+            <canvas id="previewPie" height="200"></canvas>
+        </div>
+    </div>
+    <div class="text-center">
+        <a href="{{ url_for('analyse') }}" class="btn-primary">🔬 Voir l'analyse détaillée</a>
+    </div>
+</div>
+
+{% endif %}
+
+<style>
+.hero {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: linear-gradient(135deg, #2f6b3c, #1e4d2a);
+    color: white;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+}
+
+.hero h1 { color: white; border-left: none; margin-top: 0; }
+.hero p { font-size: 1.2rem; margin-bottom: 1.5rem; }
+
+.btn-primary, .btn-secondary {
+    display: inline-block;
+    background: #e09d32;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 40px;
+    text-decoration: none;
+    font-weight: bold;
+    margin: 0 0.5rem;
+    transition: all 0.3s;
+}
+
+.btn-primary:hover, .btn-secondary:hover {
+    background: #c07d1a;
+    transform: scale(1.02);
+}
+
+.btn-secondary {
+    background: #2c6e9e;
+}
+
+.section {
+    background: #fef7e6;
+    padding: 1.5rem;
+    border-radius: 20px;
+    margin: 2rem 0;
+}
+
+.section h2 {
+    margin-top: 0;
+}
+
+.keys-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.key-item {
+    background: white;
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.key-label {
+    font-weight: bold;
+    color: #2f6b3c;
+}
+
+.key-value {
+    font-family: monospace;
+    font-size: 1.1rem;
+    background: #e8d9a3;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+}
+
+.preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.preview-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 16px;
+    text-align: center;
+}
+
+.text-center {
+    text-align: center;
+    margin-top: 1.5rem;
+}
+
+.alert-info {
+    background: #e3f2fd;
+    padding: 2rem;
+    text-align: center;
+    border-radius: 16px;
+    color: #1565c0;
+}
+</style>
+
+<script>
+// Aperçu de l'histogramme (si des données existent)
+{% if total > 0 and stats.diagrammes.histogramme_ages %}
+const histoCtx = document.getElementById('previewHistogram');
+if (histoCtx) {
+    new Chart(histoCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ stats.diagrammes.histogramme_ages|map(attribute='label')|list|tojson }},
+            datasets: [{
+                label: 'Effectif',
+                data: {{ stats.diagrammes.histogramme_ages|map(attribute='count')|list|tojson }},
+                backgroundColor: '#2f6b3c',
+                borderRadius: 8
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom' } } }
+    });
+}
+{% endif %}
+
+// Aperçu du camembert (régions)
+{% if total > 0 and stats.diagrammes.camembert_regions|length > 0 %}
+const pieCtx = document.getElementById('previewPie');
+if (pieCtx) {
+    new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ stats.diagrammes.camembert_regions|map(attribute='label')|list|tojson }},
+            datasets: [{
+                data: {{ stats.diagrammes.camembert_regions|map(attribute='value')|list|tojson }},
+                backgroundColor: ['#2f6b3c', '#e09d32', '#1e4d2a', '#f4a261', '#264653', '#2a9d8f', '#e76f51', '#6b4e3a', '#3498db', '#e74c3c']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+    });
+}
+{% endif %}
+</script>
+
 {% endblock %}
