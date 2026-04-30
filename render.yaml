@@ -1,11 +1,95 @@
+# ============================================================
+# render.yaml - Configuration pour Render.com
+# Application : FoodStat Cameroon
+# ============================================================
+
 services:
+  # Service Web principal
   - type: web
-    name: santedata
-    env: python
+    name: foodstat-cameroon
+    runtime: python
+    repo: https://github.com/mahamat17/Tp_INF232
+    plan: free
+    
+    # Branche à déployer
+    branch: main
+    
+    # Commande d'installation
     buildCommand: pip install -r requirements.txt
+    
+    # Commande de démarrage
     startCommand: gunicorn app:app
+    
+    # Dossier racine (si les fichiers ne sont pas à la racine)
+    # rootDir: ./
+    
+    # Variables d'environnement
     envVars:
-      - key: SECRET_KEY
-        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
       - key: FLASK_ENV
         value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PORT
+        value: 10000
+    
+    # Durée de vie de l'instance gratuite
+    # L'instance s'endort après 15 minutes d'inactivité
+    # mais se réveille automatiquement à la prochaine requête
+    
+    # Health Check
+    healthCheckPath: /
+    
+    # Configuration des logs
+    logging:
+      - name: application
+        path: /var/log/app.log
+        format: json
+    
+    # Autoscaling (pour plan payant)
+    # scaling:
+    #   minInstances: 1
+    #   maxInstances: 3
+    
+    # Région de déploiement
+    region: ohio
+    
+    # Headers de sécurité
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+
+  # Optionnel : Service worker pour les tâches de fond
+  # - type: worker
+  #   name: foodstat-worker
+  #   runtime: python
+  #   repo: https://github.com/mahamat17/Tp_INF232
+  #   branch: main
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: python worker.py
+  #   plan: free
+
+# Base de données (optionnel - pour plus tard)
+# databases:
+#   - name: foodstat-db
+#     databaseName: foodstat_db
+#     plan: free
+#     region: ohio
+#     postgresMajorVersion: 15
+
+# Groupes d'environnement (variables partagées)
+# envVarGroups:
+#   - name: foodstat-env
+#     envVars:
+#       - key: APP_NAME
+#         value: FoodStat Cameroon
+#       - key: APP_VERSION
+#         value: 1.0.0
